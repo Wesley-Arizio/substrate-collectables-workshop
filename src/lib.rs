@@ -6,6 +6,9 @@ mod tests;
 use frame::prelude::*;
 pub use pallet::*;
 
+use frame::traits::fungible::Inspect;
+use frame::traits::fungible::Mutate;
+
 #[frame::pallet(dev_mode)]
 pub mod pallet {
 
@@ -28,7 +31,7 @@ pub mod pallet {
 	pub trait Config: frame_system::Config {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
-		// type KittiesCount = ConstU32<100>;
+		type NativeBalance: Inspect<Self::AccountId> + Mutate<Self::AccountId>;
 	}
 
 	#[derive(Encode, Decode, TypeInfo, MaxEncodedLen)]
