@@ -19,7 +19,7 @@ impl<T: Config> Pallet<T> {
 		let current_count: u32 = CountForKitties::<T>::get();
 		let new_count = current_count.checked_add(1).ok_or(Error::<T>::TooManyKitties)?;
 
-		let kitty = Kitty { dna, owner: owner.clone() };
+		let kitty = Kitty { dna, owner: owner.clone(), price: None };
 
 		KittiesOwned::<T>::try_append(&owner, dna).map_err(|_| Error::<T>::TooManyOwned)?;
 		Kitties::<T>::insert(dna, kitty);
@@ -35,6 +35,7 @@ impl<T: Config> Pallet<T> {
 		ensure!(kitty.owner == from, Error::<T>::NotOwner);
 
 		kitty.owner = to.clone();
+		kitty.price = None;
 
 		let mut receiver = KittiesOwned::<T>::get(&to);
 		receiver.try_push(kitty_id).map_err(|_| Error::<T>::TooManyOwned)?;
