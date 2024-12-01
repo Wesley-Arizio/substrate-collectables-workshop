@@ -27,4 +27,9 @@ impl<T: Config> Pallet<T> {
 		Self::deposit_event(Event::<T>::Created { owner });
 		Ok(())
 	}
+
+	pub fn do_transfer(from: T::AccountId, to: T::AccountId, kitty_id: [u8; 32]) -> DispatchResult {
+		Self::deposit_event(Event::<T>::Transferred { from, to, kitty_id });
+		Ok(())
+	}
 }
