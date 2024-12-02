@@ -297,3 +297,31 @@ fn balance_of_type_works() {
 	// Inside our tests, the `BalanceOf` type has a concrete type of `u64`.
 	let _example_balance: BalanceOf<TestRuntime> = 1337u64;
 }
+
+#[test]
+fn set_price_emits_event() {
+	new_test_ext().execute_with(|| {
+		// We need to set block number to 1 to view events.
+		System::set_block_number(1);
+		assert_ok!(PalletKitties::create_kitty(RuntimeOrigin::signed(ALICE)));
+		let kitty_id = Kitties::<TestRuntime>::iter_keys().collect::<Vec<_>>()[0];
+		assert_ok!(PalletKitties::set_price(RuntimeOrigin::signed(ALICE), kitty_id, Some(1337)));
+		// Assert the last event is `PriceSet` event with the correct information.
+		System::assert_last_event(
+			Event::<TestRuntime>::PriceSet { owner: ALICE, kitty_id, new_price: Some(1337) }.into(),
+		);
+	})
+}
+
+#[test]
+fn set_price_logic_works() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(PalletKitties::create_kitty(RuntimeOrigin::signed(ALICE)));
+		let kitty = &Kitties::<TestRuntime>::iter_values().collect::<Vec<_>>()[0];
+		assert_eq!(kitty.price, None);
+		let kitty_id = kitty.dna;
+		assert_ok!(PalletKitties::set_price(RuntimeOrigin::signed(ALICE), kitty_id, Some(1337)));
+		let kitty = Kitties::<TestRuntime>::get(kitty_id).unwrap();
+		assert_eq!(kitty.price, Some(1337));
+	})
+}
