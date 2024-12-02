@@ -12,6 +12,7 @@
 #![cfg(test)]
 
 use crate as pallet_kitties;
+use crate::tests::sp_api_hidden_includes_construct_runtime::hidden_include::sp_runtime::TokenError;
 use crate::*;
 use frame::deps::sp_io;
 use frame::runtime::prelude::*;
@@ -323,5 +324,72 @@ fn set_price_logic_works() {
 		assert_ok!(PalletKitties::set_price(RuntimeOrigin::signed(ALICE), kitty_id, Some(1337)));
 		let kitty = Kitties::<TestRuntime>::get(kitty_id).unwrap();
 		assert_eq!(kitty.price, Some(1337));
+	})
+}
+
+#[test]
+fn do_buy_kitty_emits_event() {
+	new_test_ext().execute_with(|| {
+		// We need to set block number to 1 to view events.
+		System::set_block_number(1);
+		assert_ok!(PalletKitties::create_kitty(RuntimeOrigin::signed(ALICE)));
+		let kitty_id = Kitties::<TestRuntime>::iter_keys().collect::<Vec<_>>()[0];
+		assert_ok!(PalletKitties::set_price(RuntimeOrigin::signed(ALICE), kitty_id, Some(1337)));
+		assert_ok!(PalletBalances::mint_into(&BOB, 100_000));
+		assert_ok!(PalletKitties::buy_kitty(RuntimeOrigin::signed(BOB), kitty_id, 1337));
+		// Assert the last event by our blockchain is the `Created` event with the correct owner.
+		System::assert_last_event(
+			Event::<TestRuntime>::Sold { buyer: BOB, kitty_id, price: 1337 }.into(),
+		);
+	})
+}
+
+#[test]
+fn do_buy_kitty_logic_works() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(PalletKitties::create_kitty(RuntimeOrigin::signed(ALICE)));
+		let kitty = &Kitties::<TestRuntime>::iter_values().collect::<Vec<_>>()[0];
+		let kitty_id = kitty.dna;
+		assert_eq!(kitty.owner, ALICE);
+		assert_eq!(KittiesOwned::<TestRuntime>::get(ALICE), vec![kitty_id]);
+		// Cannot buy kitty which does not exist.
+		assert_noop!(
+			PalletKitties::buy_kitty(RuntimeOrigin::signed(BOB), [0u8; 32], 1337),
+			Error::<TestRuntime>::NoKitty
+		);
+		// Cannot buy kitty which is not for sale.
+		assert_noop!(
+			PalletKitties::buy_kitty(RuntimeOrigin::signed(BOB), kitty_id, 1337),
+			Error::<TestRuntime>::NotForSale
+		);
+		assert_ok!(PalletKitties::set_price(RuntimeOrigin::signed(ALICE), kitty_id, Some(1337)));
+		// Cannot buy kitty for a lower price.
+		assert_noop!(
+			PalletKitties::buy_kitty(RuntimeOrigin::signed(BOB), kitty_id, 1336),
+			Error::<TestRuntime>::MaxPriceTooLow
+		);
+		// Cannot buy kitty if you don't have the funds.
+		assert_noop!(
+			PalletKitties::buy_kitty(RuntimeOrigin::signed(BOB), kitty_id, 1337),
+			frame::arithmetic::ArithmeticError::Underflow
+		);
+		// Cannot buy kitty if it would kill your account (i.e. set your balance to 0).
+		assert_ok!(PalletBalances::mint_into(&BOB, 1337));
+		assert_noop!(
+			PalletKitties::buy_kitty(RuntimeOrigin::signed(BOB), kitty_id, 1337),
+			DispatchError::Token(TokenError::NotExpendable)
+		);
+		// When everything is right, it works.
+		assert_ok!(PalletBalances::mint_into(&BOB, 100_000));
+		assert_ok!(PalletKitties::buy_kitty(RuntimeOrigin::signed(BOB), kitty_id, 1337));
+		// State is updated correctly.
+		assert_eq!(KittiesOwned::<TestRuntime>::get(BOB), vec![kitty_id]);
+		let kitty = Kitties::<TestRuntime>::get(kitty_id).unwrap();
+		assert_eq!(kitty.owner, BOB);
+		// Price is reset to `None`.
+		assert_eq!(kitty.price, None);
+		// BOB transferred funds to ALICE.
+		assert_eq!(PalletBalances::balance(&ALICE), 1337);
+		assert_eq!(PalletBalances::balance(&BOB), 100_000);
 	})
 }

@@ -25,6 +25,8 @@ pub mod pallet {
 		TransferToSelf,
 		NoKitty,
 		NotOwner,
+		MaxPriceTooLow,
+		NotForSale,
 	}
 
 	#[pallet::config]
@@ -63,6 +65,7 @@ pub mod pallet {
 		Created { owner: T::AccountId },
 		Transferred { from: T::AccountId, to: T::AccountId, kitty_id: [u8; 32] },
 		PriceSet { owner: T::AccountId, new_price: Option<BalanceOf<T>>, kitty_id: [u8; 32] },
+		Sold { buyer: T::AccountId, kitty_id: [u8; 32], price: BalanceOf<T> },
 	}
 
 	#[pallet::storage]
@@ -94,6 +97,16 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			Self::do_set_price(who, kitty_id, new_price)?;
+			Ok(())
+		}
+
+		pub fn buy_kitty(
+			origin: OriginFor<T>,
+			kitty_id: [u8; 32],
+			max_price: BalanceOf<T>,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			Self::do_buy_kitty(who, kitty_id, max_price)?;
 			Ok(())
 		}
 	}
